@@ -42,7 +42,7 @@ def spinner(stop_event):
     sys.stdout.write('\r')
     sys.stdout.flush()
 
-def run_benchmark(num_runs=3):
+def run_benchmark(num_runs=3, machine_name="unknown"):
     """Run benchmark test and return results"""
 
     client = OpenAI(
@@ -78,6 +78,7 @@ def run_benchmark(num_runs=3):
             result = {
                 "timestamp": datetime.now().isoformat(),
                 "model": MODEL_NAME,
+                "machine": machine_name,
                 "run": run,
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": tokens_generated,
@@ -102,7 +103,7 @@ def save_to_csv(results):
     file_exists = Path(CSV_FILE).exists()
 
     fieldnames = [
-        "timestamp", "model", "run", "prompt_tokens", "completion_tokens", "total_time_seconds", "tokens_per_second", "time_to_first_token"
+        "timestamp", "model", "machine", "run", "prompt_tokens", "completion_tokens", "total_time_seconds", "tokens_per_second", "time_to_first_token"
     ]
 
     with open(CSV_FILE, 'a', newline='') as f:
@@ -141,6 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("--url", type=str, help="Override API URL from .env")
     parser.add_argument("--apikey", type=str, help="Override API Key from .env")
     parser.add_argument("--output", type=str, default="benchmark_results.csv")
+    parser.add_argument("--machine", type=str, help="Machine name to include in CSV")
     args = parser.parse_args()
 
     # Override with CLI args if provided
@@ -153,14 +155,24 @@ if __name__ == "__main__":
     
     CSV_FILE = args.output
 
+    # Determine machine name (CLI arg takes precedence, otherwise prompt)
+    if args.machine:
+        machine_name = args.machine
+    else:
+        try:
+            machine_name = input("Enter machine name (optional): ").strip() or "unknown"
+        except EOFError:
+            machine_name = "unknown"
+
     print("LLM Benchmark Tool")
     print("="*50)
     print(f"API URL: {API_URL}")
     print(f"Model: {MODEL_NAME}")
+    print(f"Machine: {machine_name}")
     print("="*50)
 
     # run benchmark
-    results = run_benchmark(num_runs=3)
+    results = run_benchmark(num_runs=args.runs, machine_name=machine_name)
 
     if results:
         # Save to CSV
