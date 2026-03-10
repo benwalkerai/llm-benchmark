@@ -20,6 +20,23 @@ A simple Python tool for benchmarking local LLM performance by measuring tokens-
 pip install openai python-dotenv
 ```
 
+### Install directly from GitHub
+
+From the repository:
+```bash
+pip install "git+https://github.com/benwalkerai/LLM-Benchmark.git"
+```
+
+From a tagged release:
+```bash
+pip install "git+https://github.com/benwalkerai/LLM-Benchmark.git@v0.1.2"
+```
+
+From a release wheel asset:
+```bash
+pip install "https://github.com/benwalkerai/LLM-Benchmark/releases/download/v0.1.2/llm_benchmark-0.1.2-py3-none-any.whl"
+```
+
 3. **Create a `.env` file:**
 ```env
 API_URL=http://localhost:11434/v1
