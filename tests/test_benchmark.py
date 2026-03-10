@@ -8,17 +8,6 @@ import pytest
 from llm_benchmark.benchmark import BenchmarkResult, run_benchmark, run_single
 
 
-@pytest.fixture
-def mock_client():
-    """Return a mocked OpenAI client."""
-    client = MagicMock()
-    response = MagicMock()
-    response.usage.completion_tokens = 120
-    response.usage.prompt_tokens = 50
-    client.chat.completions.create.return_value = response
-    return client
-
-
 class TestBenchmarkResult:
     def test_to_dict_has_all_keys(self):
         result = BenchmarkResult(
@@ -53,21 +42,39 @@ class TestBenchmarkResult:
 
 
 class TestRunSingle:
-    def test_successful_run(self, mock_client):
-        result = run_single(
-            client=mock_client,
-            model="llama3",
-            machine="test-machine",
-            run_number=1,
-            prompt="test prompt",
-        )
-        assert isinstance(result, BenchmarkResult)
-        assert result.model == "llama3"
-        assert result.completion_tokens == 120
-        assert result.prompt_tokens == 50
-        assert result.tokens_per_second > 0
+    def test_successful_run(self):
+        # Create a fresh mock for this test
+        client = MagicMock()
+        chunk1 = MagicMock()
+        chunk1.choices = [MagicMock()]
+        chunk1.choices[0].delta.content = "Hello world test "
+        chunk1.usage = None
+        
+        chunk2 = MagicMock()
+        chunk2.choices = [MagicMock()]
+        chunk2.choices[0].delta.content = None  
+        chunk2.usage = MagicMock()
+        chunk2.usage.prompt_tokens = 50
+        
+        client.chat.completions.create.return_value = iter([chunk1, chunk2])
+        
+        with patch("llm_benchmark.benchmark.time.time", side_effect=[0.0, 0.1, 2.5]):
+            result = run_single(
+                client=client,
+                model="llama3",
+                machine="test-machine",
+                run_number=1,
+                prompt="test prompt",
+            )
+            assert isinstance(result, BenchmarkResult)
+            assert result.model == "llama3"
+            assert result.completion_tokens > 0
+            assert result.tokens_per_second > 0
+            # Check TTFT was captured
+            assert result.time_to_first_token != "N/A"
 
-    def test_api_failure_raises_runtime_error(self, mock_client):
+    def test_api_failure_raises_runtime_error(self):
+        mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = Exception("Connection refused")
         with pytest.raises(RuntimeError, match="API call failed"):
             run_single(
@@ -83,10 +90,23 @@ class TestRunBenchmark:
     @patch("llm_benchmark.benchmark.OpenAI")
     def test_returns_results_list(self, mock_openai):
         mock_client = MagicMock()
-        response = MagicMock()
-        response.usage.completion_tokens = 100
-        response.usage.prompt_tokens = 40
-        mock_client.chat.completions.create.return_value = response
+        
+        # Create streaming mock response
+        def create_stream():
+            chunk1 = MagicMock()
+            chunk1.choices = [MagicMock()]
+            chunk1.choices[0].delta.content = "Test response content "
+            chunk1.usage = None
+            
+            chunk2 = MagicMock()
+            chunk2.choices = [MagicMock()]
+            chunk2.choices[0].delta.content = None
+            chunk2.usage = MagicMock()
+            chunk2.usage.prompt_tokens = 40
+            
+            return iter([chunk1, chunk2])
+        
+        mock_client.chat.completions.create.side_effect = [create_stream(), create_stream()]
         mock_openai.return_value = mock_client
 
         results = run_benchmark(

@@ -1,13 +1,18 @@
 """CLI entry point for llm-benchmark."""
 
 import os
+import socket
 from pathlib import Path
 
 import click
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.panel import Panel
 
 from .benchmark import DEFAULT_PROMPT, run_benchmark
 from .output import print_summary, save_to_csv
+
+console = Console()
 
 load_dotenv()
 
@@ -39,8 +44,9 @@ load_dotenv()
 )
 @click.option(
     "--machine",
-    default="",
-    help="Machine name label to include in results (prompted if not set).",
+    default=lambda: socket.gethostname(),
+    show_default="system hostname",
+    help="Machine name label to include in results.",
 )
 @click.option(
     "--output",
@@ -55,6 +61,13 @@ load_dotenv()
     show_default=True,
     help="Maximum completion tokens per run.",
 )
+@click.option(
+    "--temperature",
+    default=0.7,
+    show_default=True,
+    type=float,
+    help="Sampling temperature (0.0 to 2.0).",
+)
 @click.version_option()
 def main(
     runs: int,
@@ -64,6 +77,7 @@ def main(
     machine: str,
     output: str,
     max_tokens: int,
+    temperature: float,
 ) -> None:
     """Benchmark an LLM inference endpoint and record tokens/sec performance."""
     if not url:
@@ -71,15 +85,16 @@ def main(
     if not model:
         raise click.UsageError("Model name is required. Set --model or MODEL_NAME in .env")
 
-    if not machine:
-        machine = click.prompt("Enter machine name (optional)", default="unknown")
+    if runs <= 0:
+        raise click.UsageError("--runs must be a positive integer (> 0)")
+    if max_tokens <= 0:
+        raise click.UsageError("--max-tokens must be a positive integer (> 0)")
+    if not 0.0 <= temperature <= 2.0:
+        raise click.UsageError("--temperature must be between 0.0 and 2.0")
 
-    click.echo("LLM Benchmark Tool")
-    click.echo("=" * 50)
-    click.echo(f"API URL: {url}")
-    click.echo(f"Model:   {model}")
-    click.echo(f"Machine: {machine}")
-    click.echo("=" * 50)
+    # Display configuration in a styled panel
+    config_text = f"[cyan]API URL:[/cyan]  {url}\n[cyan]Model:[/cyan]      {model}\n[cyan]Machine:[/cyan]    {machine}"
+    console.print(Panel(config_text, title="[bold cyan]LLM Benchmark[/bold cyan]", border_style="cyan"))
 
     results = run_benchmark(
         api_url=url,
@@ -89,13 +104,14 @@ def main(
         num_runs=runs,
         prompt=DEFAULT_PROMPT,
         max_tokens=max_tokens,
+        temperature=temperature,
     )
 
     if results:
         save_to_csv(results, Path(output))
         print_summary(results, model=model)
     else:
-        click.echo("\nNo successful runs completed.", err=True)
+        console.print("[bold red]✗ No successful runs completed.[/bold red]")
         raise SystemExit(1)
 
 

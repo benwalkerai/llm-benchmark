@@ -31,9 +31,14 @@ MODEL_NAME=llama3.2:latest
 
 ### Basic Usage
 
-Run with defaults from `.env`:
+After installing with `pip install -e .`:  
 ```bash
-python benchmark.py
+llm-benchmark
+```
+
+Or run directly without installation:
+```bash
+python -m llm_benchmark.cli
 ```
 
 ### CLI Arguments
@@ -42,19 +47,19 @@ Override settings with command-line arguments:
 
 ```bash
 # Run 5 benchmark tests
-python benchmark.py --runs 5
+llm-benchmark --runs 5
 
 # Test a different model
-python benchmark.py --model llama3.2:1b
+llm-benchmark --model llama3.2:1b
 
 # Use a different API endpoint
-python benchmark.py --url http://localhost:8080/v1
+llm-benchmark --url http://localhost:8080/v1
 
 # Custom output file
-python benchmark.py --output my_results.csv
+llm-benchmark --output my_results.csv
 
 # Combine multiple options
-python benchmark.py --model llama3.3:70b --runs 10 --output gpu_test.csv
+llm-benchmark --model llama3.3:70b --runs 10 --output gpu_test.csv
 ```
 
 ### Available Arguments
@@ -166,14 +171,13 @@ Avg tokens/sec: 40.12
 
 ## Comparing Multiple Models
 
-Create a bash script to test multiple models:
+Run benchmarks on different models while the LLM server is running:
 
 ```bash
-#!/bin/bash
-
-python benchmark.py --model llama3.2:1b --runs 5
-python benchmark.py --model llama3.2:3b --runs 5
-python benchmark.py --model llama3.3:70b --runs 5
+# Test multiple models sequentially
+llm-benchmark --model llama3.2:1b --runs 5
+llm-benchmark --model llama3.2:3b --runs 5
+llm-benchmark --model llama3.3:70b --runs 5
 
 echo "All benchmarks complete! Check benchmark_results.csv"
 ```

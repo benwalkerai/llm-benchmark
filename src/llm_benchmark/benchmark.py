@@ -9,6 +9,9 @@ from datetime import datetime
 from typing import Optional
 
 from openai import OpenAI
+from rich.console import Console
+
+console = Console()
 
 # Standard benchmark prompt
 DEFAULT_PROMPT = """
@@ -86,13 +89,34 @@ def run_single(
 
     try:
         start_time = time.time()
-        response = client.chat.completions.create(
+        stream = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
             temperature=temperature,
-            stream=False,
+            stream=True,
         )
+        
+        first_token_time = None
+        completion_text = ""
+        prompt_tokens = 0
+        
+        # Process streaming response
+        for chunk in stream:
+            if first_token_time is None and chunk.choices and len(chunk.choices) > 0:
+                if chunk.choices[0].delta.content:
+                    first_token_time = time.time()
+            
+            # Accumulate content
+            if chunk.choices and len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                if delta.content:
+                    completion_text += delta.content
+            
+            # Capture usage info when available
+            if hasattr(chunk, 'usage') and chunk.usage:
+                prompt_tokens = chunk.usage.prompt_tokens
+        
         end_time = time.time()
     except Exception as e:
         stop_spinner.set()
@@ -103,8 +127,12 @@ def run_single(
         spinner_thread.join()
 
     total_time = end_time - start_time
-    tokens_generated = response.usage.completion_tokens
-    prompt_tokens = response.usage.prompt_tokens
+    tokens_generated = len(completion_text.split())  # Approximate token count
+    
+    # Calculate TTFT if we captured it
+    ttft = round((first_token_time - start_time) * 1000, 2) if first_token_time else None
+    ttft_str = f"{ttft}ms" if ttft is not None else "N/A"
+    
     tokens_per_second = tokens_generated / total_time if total_time > 0 else 0.0
 
     return BenchmarkResult(
@@ -112,10 +140,11 @@ def run_single(
         model=model,
         machine=machine,
         run=run_number,
-        prompt_tokens=prompt_tokens,
+        prompt_tokens=prompt_tokens if prompt_tokens > 0 else len(prompt.split()),
         completion_tokens=tokens_generated,
         total_time_seconds=round(total_time, 2),
         tokens_per_second=round(tokens_per_second, 2),
+        time_to_first_token=ttft_str,
     )
 
 
@@ -127,6 +156,7 @@ def run_benchmark(
     num_runs: int = 3,
     prompt: str = DEFAULT_PROMPT,
     max_tokens: int = 500,
+    temperature: float = 0.7,
 ) -> list[BenchmarkResult]:
     """Run the full benchmark suite and return all results.
 
@@ -138,6 +168,7 @@ def run_benchmark(
         num_runs: Number of benchmark iterations.
         prompt: Prompt to use for benchmarking.
         max_tokens: Maximum completion tokens per run.
+        temperature: Sampling temperature (0.0 to 2.0).
 
     Returns:
         List of BenchmarkResult objects for successful runs.
@@ -146,7 +177,7 @@ def run_benchmark(
     results = []
 
     for run in range(1, num_runs + 1):
-        print(f"\nRun {run}/{num_runs}...")
+        console.print(f"\\n[bold cyan]Run {run}/{num_runs}[/bold cyan]")
         try:
             result = run_single(
                 client=client,
@@ -155,13 +186,15 @@ def run_benchmark(
                 run_number=run,
                 prompt=prompt,
                 max_tokens=max_tokens,
+                temperature=temperature,
             )
             results.append(result)
-            print(f" Tokens generated: {result.completion_tokens}")
-            print(f" Time: {result.total_time_seconds:.2f}s")
-            print(f" Speed: {result.tokens_per_second:.2f} tokens/sec")
+            console.print(f" [green]✓ Tokens:[/green] {result.completion_tokens}")
+            console.print(f" [green]✓ Time:[/green]   {result.total_time_seconds:.2f}s")
+            console.print(f" [green]✓ TTFT:[/green]   {result.time_to_first_token}")
+            console.print(f" [green]✓ Speed:[/green]  {result.tokens_per_second:.2f} tokens/sec")
         except RuntimeError as e:
-            print(f" Error: {e}")
+            console.print(f" [red]✗ Error:[/red] {e}")
             continue
 
     return results
