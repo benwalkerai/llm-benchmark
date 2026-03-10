@@ -37,8 +37,7 @@ jobs:
           TWINE_USERNAME: ${{ github.actor }}
           TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uv run python -m pip install --upgrade twine
-          uv run python -m twine upload \
+          uvx twine upload \
             --skip-existing \
             --repository-url https://upload.pypi.pkg.github.com/${{ github.repository_owner }}/ \
             dist/*
