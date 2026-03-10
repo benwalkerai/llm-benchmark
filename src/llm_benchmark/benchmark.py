@@ -1,12 +1,11 @@
 """Core benchmarking logic for LLM inference endpoints."""
 
-import time
-import threading
 import itertools
 import sys
+import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from openai import OpenAI
 from rich.console import Console
@@ -51,7 +50,20 @@ class BenchmarkResult:
 
 def spinner(stop_event: threading.Event) -> None:
     """Display a spinner animation while benchmarking."""
-    spinner_chars = itertools.cycle(["\u280b", "\u2819", "\u2839", "\u2838", "\u283c", "\u2834", "\u2826", "\u2827", "\u2807", "\u280f"])
+    spinner_chars = itertools.cycle(
+        [
+            "\u280b",
+            "\u2819",
+            "\u2839",
+            "\u2838",
+            "\u283c",
+            "\u2834",
+            "\u2826",
+            "\u2827",
+            "\u2807",
+            "\u280f",
+        ]
+    )
     while not stop_event.is_set():
         sys.stdout.write(f"\r {next(spinner_chars)} Processing...")
         sys.stdout.flush()
@@ -68,7 +80,7 @@ def run_single(
     prompt: str,
     max_tokens: int = 500,
     temperature: float = 0.7,
-) -> Optional[BenchmarkResult]:
+) -> BenchmarkResult | None:
     """Execute a single benchmark run and return a BenchmarkResult.
 
     Args:
@@ -96,27 +108,26 @@ def run_single(
             temperature=temperature,
             stream=True,
         )
-        
         first_token_time = None
         completion_text = ""
         prompt_tokens = 0
-        
+
         # Process streaming response
         for chunk in stream:
             if first_token_time is None and chunk.choices and len(chunk.choices) > 0:
                 if chunk.choices[0].delta.content:
                     first_token_time = time.time()
-            
+
             # Accumulate content
             if chunk.choices and len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
                 if delta.content:
                     completion_text += delta.content
-            
+
             # Capture usage info when available
             if hasattr(chunk, 'usage') and chunk.usage:
                 prompt_tokens = chunk.usage.prompt_tokens
-        
+
         end_time = time.time()
     except Exception as e:
         stop_spinner.set()
@@ -128,11 +139,11 @@ def run_single(
 
     total_time = end_time - start_time
     tokens_generated = len(completion_text.split())  # Approximate token count
-    
+
     # Calculate TTFT if we captured it
     ttft = round((first_token_time - start_time) * 1000, 2) if first_token_time else None
     ttft_str = f"{ttft}ms" if ttft is not None else "N/A"
-    
+
     tokens_per_second = tokens_generated / total_time if total_time > 0 else 0.0
 
     return BenchmarkResult(

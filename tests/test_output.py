@@ -1,7 +1,6 @@
 """Tests for the output module."""
 
 import csv
-from pathlib import Path
 
 import pytest
 

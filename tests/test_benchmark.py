@@ -1,6 +1,5 @@
 """Tests for the core benchmarking module."""
 
-import threading
 from unittest.mock import MagicMock, patch
 
 import pytest

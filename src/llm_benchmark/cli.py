@@ -93,8 +93,18 @@ def main(
         raise click.UsageError("--temperature must be between 0.0 and 2.0")
 
     # Display configuration in a styled panel
-    config_text = f"[cyan]API URL:[/cyan]  {url}\n[cyan]Model:[/cyan]      {model}\n[cyan]Machine:[/cyan]    {machine}"
-    console.print(Panel(config_text, title="[bold cyan]LLM Benchmark[/bold cyan]", border_style="cyan"))
+    config_text = (
+        f"[cyan]API URL:[/cyan]  {url}\n"
+        f"[cyan]Model:[/cyan]      {model}\n"
+        f"[cyan]Machine:[/cyan]    {machine}"
+    )
+    console.print(
+        Panel(
+            config_text,
+            title="[bold cyan]LLM Benchmark[/bold cyan]",
+            border_style="cyan",
+        )
+    )
 
     results = run_benchmark(
         api_url=url,
